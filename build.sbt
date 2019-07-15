@@ -3,9 +3,10 @@ name := "Spark_ICP_3"
 version := "0.1"
 
 scalaVersion := "2.11.8"
-
-// https://mvnrepository.com/artifact/org.apache.spark/spark-core
-libraryDependencies += "org.apache.spark" %% "spark-core" % "2.3.2"
-
-// https://mvnrepository.com/artifact/org.apache.spark/spark-sql
-libraryDependencies += "org.apache.spark" %% "spark-sql" % "2.3.2"
+libraryDependencies ++= Seq(
+  "org.apache.spark" %% "spark-core" % "1.6.1" % "provided",
+  "org.apache.spark" %% "spark-streaming" % "1.6.1",
+  "org.apache.spark" %% "spark-mllib" % "1.6.1",
+  "com.databricks" % "spark-csv_2.11" % "1.5.0"
+  
+)
