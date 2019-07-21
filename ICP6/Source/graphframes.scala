@@ -7,112 +7,102 @@ import org.apache.log4j._
 import org.graphframes._
 
 
-object icp6 {
+object graphframes {
 
   def main(args: Array[String]): Unit = {
 
-    val conf = new SparkConf().setMaster("local[2]").setAppName("GraphAlgo")
+    val conf = new SparkConf().setMaster("local[2]").setAppName("GraphAlgorithm")
     val sc = new SparkContext(conf)
     val spark = SparkSession
       .builder()
-      .appName("GraphAlgo")
+      .appName("GraphAlgorithm")
       .config(conf =conf)
       .getOrCreate()
-
 
     Logger.getLogger("org").setLevel(Level.ERROR)
     Logger.getLogger("akka").setLevel(Level.ERROR)
 
-    val trips_df = spark.read
+    //importing dataset
+    val tr = spark.read
       .format("csv")
       .option("header", "true") //reading the headers
       .option("mode", "DROPMALFORMED")
-      .load("/Users/anushamuppalla/Desktop/SparkGraphframe/datasets/201508_trip_data.csv")
+      .load("datasets/201508_trip_data.csv")  //change this
 
-    val station_df = spark.read
+    val st = spark.read
       .format("csv")
       .option("header", "true") //reading the headers
       .option("mode", "DROPMALFORMED")
-      .load("/Users/anushamuppalla/Desktop/SparkGraphframe/datasets/201508_station_data.csv")
-
-
+      .load("datasets/201508_station_data.csv")  //change this
 
     // Printing the Schema
+    tr.printSchema()
+    st.printSchema()
 
-    trips_df.printSchema()
+    //Temp View
+    tr.createOrReplaceTempView("Trips")
+    st.createOrReplaceTempView("Stations")
 
-    station_df.printSchema()
-
-
-
-    //First of all creat three Temp View
-
-    trips_df.createOrReplaceTempView("Trips")
-
-    station_df.createOrReplaceTempView("Stations")
-
-
+    //total stations and trips
     val station = spark.sql("select * from Stations")
-
     val trips = spark.sql("select * from Trips")
 
+    //removing duplicates and renaming columns and creating vertices
     val stationVertices = station
       .withColumnRenamed("name", "id")
       .distinct()
 
+    //removing duplicates and renaming columns and creating edges
     val tripEdges = trips
       .withColumnRenamed("Start Station", "src")
       .withColumnRenamed("End Station", "dst")
 
-
+    //create a graphframe with above vertex and edges
     val stationGraph = GraphFrame(stationVertices, tripEdges)
-
     tripEdges.cache()
     stationVertices.cache()
 
-    println("Total Number of Stations: " + stationGraph.vertices.count)
-    println("Total Number of Distinct Stations: " + stationGraph.vertices.distinct().count)
-    println("Total Number of Trips in Graph: " + stationGraph.edges.count)
-    println("Total Number of Distinct Trips in Graph: " + stationGraph.edges.distinct().count)
-    println("Total Number of Trips in Original Data: " + trips.count)//
+   // println("Total Number of Stations: " + stationGraph.vertices.count)
+   // println("Total Number of Distinct Stations: " + stationGraph.vertices.distinct().count)
+   // println("Total Number of Trips in Graph: " + stationGraph.edges.count)
+   // println("Total Number of Distinct Trips in Graph: " + stationGraph.edges.distinct().count)
+   // println("Total Number of Trips in Original Data: " + trips.count)//
 
-    stationGraph.vertices.show()
-
-    stationGraph.edges.show()
-
+    //show some vertices and edges
+    // stationGraph.vertices.show()
+    //stationGraph.edges.show()
 
     // Triangle Count
-
-    val stationTraingleCount = stationGraph.triangleCount.run()
-    stationTraingleCount.select("id","count").show()
+    val stTriCount = stationGraph.triangleCount.run()
+    stTriCount.select("id","count").show()
 
     // Shortest Path
-    val shortPath = stationGraph.shortestPaths.landmarks(Seq("Japantown","San Jose Civic Center","Santa Clara County Civic Center")).run
-    shortPath.show(numRows = 30,truncate = false)
+    val shortpath = stationGraph.shortestPaths.landmarks(Seq("Japantown","San Jose Civic Center","Santa Clara County Civic Center")).run
+    shortpath.select("id","distances").show()
+    //shortpath.show(numRows = 30,truncate = false)
 
     //Page Rank
+    val stPgRank = stationGraph.pageRank.resetProbability(0.15).tol(0.01).run()
+    stPgRank.vertices.select("id", "pagerank").show(10)
+    stPgRank.edges.select("src", "dst", "weight").distinct().show(10)
+    
+    //save graphs generated
+    stationGraph.vertices.write.csv("\\vertices")  //location of vertices folder
+    stationGraph.edges.write.csv("\\edges")  //location of edges folder
 
-    val stationPageRank = stationGraph.pageRank.resetProbability(0.15).tol(0.01).run()
-    stationPageRank.vertices.show()
-    stationPageRank.edges.show()
+    //Bonus 1 : Label Propagation Algorithm
+    val lprop = stationGraph.labelPropagation.maxIter(5).run()
+    lprop.orderBy("label").show(10)
+    //lprop.orderBy("id").show(10)
 
-    //page rank for particular
-    val stationPageRank1 = stationGraph.pageRank.resetProbability(0.15).maxIter(12).sourceId("Japantown")run()
-    stationPageRank1.vertices.show()
-
-    // BFS
-
-    val pathBFS = stationGraph.bfs.fromExpr("id = 'Japantown'").toExpr("dockcount < 12").run()
-    pathBFS.show(numRows = 70,truncate = false)
-
-   //label
-   val result = stationGraph.labelPropagation.maxIter(5).run()
-    result.orderBy("id").show()
-
-
-
-
+    //Bonus 3 : BFS
+    val bfs = stationGraph.bfs
+      .fromExpr("id = 'Townsend at 7th'")
+      .toExpr("id = 'Spear at Folsom'")
+      .maxPathLength(2).run()
+    bfs.show(10)
+    // val pathBFS = stationGraph.bfs.fromExpr("id = 'Japantown'").toExpr("dockcount < 12").run()
+    //pathBFS.show(numRows = 70,truncate = false)
 
   }
-
 }
