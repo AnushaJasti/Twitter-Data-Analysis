@@ -34,7 +34,7 @@ object graphframes {
       .format("csv")
       .option("header", "true") //reading the headers
       .option("mode", "DROPMALFORMED")
-      .load("/Users/anushamuppalla/Desktop/SparkGraphframe/datasets/201508_station_data.csv")
+      .load("/Users/anushamuppalla/Desktop/SparkGraphframe/datasets/201508_station_data.csv")  //change this
 
 
 
@@ -44,6 +44,7 @@ object graphframes {
 
     s.printSchema()
 
+    
 
     //First of all create three Temp View
 
@@ -52,18 +53,21 @@ object graphframes {
     s.createOrReplaceTempView("Stations")
 
 
+    
     //total stations and trip places
     val station = spark.sql("select * from Stations")
 
     val trips = spark.sql("select * from Trips")
 
 
+    
     //removing duplicates
     val stationVertices = station
       .withColumnRenamed("name", "id")
       .distinct()
 
 
+    
     //renaming columns
     val tripEdges = trips
       .withColumnRenamed("Start Station", "src")
@@ -82,12 +86,14 @@ object graphframes {
     println("Total Number of Trips in Original Data: " + trips.count)//
 
 
+    
     //show some vertices and edges
     stationGraph.vertices.show()
 
     stationGraph.edges.show()
 
 
+    
 
    //indegree---incoming edges
     val inDeg = stationGraph.inDegrees
