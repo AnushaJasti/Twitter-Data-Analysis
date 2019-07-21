@@ -145,9 +145,9 @@ object graphframes {
 
 
 
-    stationGraph.vertices.write.csv("/Users/anushamuppalla/Desktop/SparkGraphframe/vertices")
+    stationGraph.vertices.write.csv("/Users/anushamuppalla/Desktop/SparkGraphframe/vertices")  //change this
 
-    stationGraph.edges.write.csv("/Users/anushamuppalla/Desktop/SparkGraphframe/edges")
+    stationGraph.edges.write.csv("/Users/anushamuppalla/Desktop/SparkGraphframe/edges")   //change this
 
   }
 }
