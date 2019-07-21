@@ -20,62 +20,49 @@ object graphframes {
       .config(conf =conf)
       .getOrCreate()
 
-
     Logger.getLogger("org").setLevel(Level.ERROR)
     Logger.getLogger("akka").setLevel(Level.ERROR)
 
-    val t = spark.read
+    //importing the dataset
+    val tr = spark.read
       .format("csv")
       .option("header", "true") //reading the headers
       .option("mode", "DROPMALFORMED")
-      .load("/Users/anushamuppalla/Desktop/SparkGraphframe/datasets/201508_trip_data.csv")  //change this
+      .load("datasets/201508_trip_data.csv")  //change this
 
-    val s = spark.read
+    //importing the dataset
+    val st = spark.read
       .format("csv")
       .option("header", "true") //reading the headers
       .option("mode", "DROPMALFORMED")
-      .load("/Users/anushamuppalla/Desktop/SparkGraphframe/datasets/201508_station_data.csv")  //change this
-
-
+      .load("datasets/201508_station_data.csv")  //change this
 
     // Printing the Schema
-
-    t.printSchema()
-
-    s.printSchema()
-
-    
-
-    //First of all create three Temp View
-
-    t.createOrReplaceTempView("Trips")
-
-    s.createOrReplaceTempView("Stations")
-
-
-    
-    //total stations and trip places
-    val station = spark.sql("select * from Stations")
-
-    val trips = spark.sql("select * from Trips")
-
-
-    
-    //removing duplicates
+    tr.printSchema() 
+    st.printSchema()
+ 
+    //Temp View
+    tr.createOrReplaceTempView("Trips")
+    st.createOrReplaceTempView("Stations")
+   
+    //concatenation
+    val concat = spark.sql("select concat(lat,long) from Stations").show()
+    //total staions and trips
+    val nstation = spark.sql("select * from Stations")
+    val ntrips = spark.sql("select * from Trips")
+   
+    //removing duplicates and renaming columns and creating vertices 
     val stationVertices = station
       .withColumnRenamed("name", "id")
       .distinct()
-
-
     
-    //renaming columns
+    //removing du-plicates and renaming columns and creating edges
     val tripEdges = trips
       .withColumnRenamed("Start Station", "src")
       .withColumnRenamed("End Station", "dst")
-
-
+    
+    //create a graphframe with above vertex and edges
     val stationGraph = GraphFrame(stationVertices, tripEdges)
-
     tripEdges.cache()
     stationVertices.cache()
 
@@ -84,70 +71,48 @@ object graphframes {
     println("Total Number of Trips in Graph: " + stationGraph.edges.count)
     println("Total Number of Distinct Trips in Graph: " + stationGraph.edges.distinct().count)
     println("Total Number of Trips in Original Data: " + trips.count)//
-
-
-    
-    //show some vertices and edges
+ 
+    //show some vertices
     stationGraph.vertices.show()
-
+    //show some edges
     stationGraph.edges.show()
 
-
-    
-
-   //indegree---incoming edges
+    //indegree
     val inDeg = stationGraph.inDegrees
-
     println("InDegree" + inDeg.orderBy(desc("inDegree")).limit(5))
     inDeg.show(5)
 
-    //outgoing edges
+    //outdegree
     val outDeg = stationGraph.outDegrees
     println("OutDegree" + outDeg.orderBy(desc("outDegree")).limit(5))
     outDeg.show(5)
 
-
-
-
-    //motifs---internal pattern
+    //motifs
     val motifs = stationGraph.find("(a)-[e]->(b); (b)-[e2]->(a)")
-
     motifs.show()
-
-
-
-    //BONUS--VERTIX degree
+ 
+    //Bonus 1 : vertex degree
     val ver = stationGraph.degrees
     ver.show(5)
-    println("Degree" + ver.orderBy(desc("Degree")).limit(5))
-
-
+    
+    //Bonus 2 : Common destinations
+    val commondest = stationGraph.edges
+      .groupBy("src", "dst").count()
+      .orderBy(desc("count"))
+      .limit(10)
+    commondest.show()
+    
+    //Bonus3 : highest in degrees, fewest out degrees
     val degreeRatio = inDeg.join(outDeg, inDeg.col("id") === outDeg.col("id"))
       .drop(outDeg.col("id"))
       .selectExpr("id", "double(inDegree)/double(outDegree) as degreeRatio")
-
     degreeRatio.cache()
-
-
     println(degreeRatio.orderBy(desc("degreeRatio")).limit(10))
     degreeRatio.show()
 
-
-    val topTrips = stationGraph
-      .edges
-      .groupBy("src", "dst")
-      .count()
-      .orderBy(desc("count"))
-      .limit(10)
-
-    topTrips.show()
-
-
-
-
-    stationGraph.vertices.write.csv("/Users/anushamuppalla/Desktop/SparkGraphframe/vertices")  //change this
-
-    stationGraph.edges.write.csv("/Users/anushamuppalla/Desktop/SparkGraphframe/edges")   //change this
+    //Bonus4 : save graphs generated
+    stationGraph.vertices.write.csv("\\vertices")  //location of vertices folder
+    stationGraph.edges.write.csv("\\edges")  //location of edges folder
 
   }
 }
